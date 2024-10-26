@@ -164,12 +164,23 @@ class MyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         # Kompilieren der Java-Datei
         compile_process = subprocess.run(
-            [javac_path, "-source", "8", "-target", "8", java_file],
+            [javac_path, "--release", "8", java_file],
             capture_output=True, text=True
         )
+    
+        # Filtern der Fehlermeldung, nur Zeilen mit dem Begriff "Fehler" behalten
+        error_lines = "\n".join(
+            line for line in compile_process.stderr.splitlines() if "Fehler" in line
+        )
+    
         if compile_process.returncode != 0:
-            logging.error(f"Kompilierungsfehler: {compile_process.stderr}")
-            self.send_error(500, f"Kompilierungsfehler: {compile_process.stderr}")
+            # Rückgabe nur der gefilterten Fehlermeldungen an den Client
+            error_message = f"Kompilierungsfehler:\n{error_lines}"
+            logging.error(error_message)
+            self.send_response(400)  # Statuscode 400 für Bad Request
+            self.send_header("Content-type", "text/plain")
+            self.end_headers()
+            self.wfile.write(error_message.encode('utf-8'))
             return
 
         # Ausführen der kompilierten Java-Klasse
@@ -178,15 +189,22 @@ class MyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             capture_output=True, text=True
         )
         if run_process.returncode != 0:
-            logging.error(f"Fehler bei der Ausführung: {run_process.stderr}")
-            self.send_error(500, f"Fehler bei der Ausführung: {run_process.stderr}")
+            # Rückgabe des Laufzeitfehlers an den Client
+            error_message = f"Fehler bei der Ausführung:\n{run_process.stderr}"
+            logging.error(error_message)
+            self.send_response(500)  # Statuscode 500 für internen Serverfehler
+            self.send_header("Content-type", "text/plain")
+            self.end_headers()
+            self.wfile.write(error_message.encode('utf-8'))
             return
 
-        # Rückgabe der Ausgabe an den Client
+        # Rückgabe der erfolgreichen Ausgabe
         self.send_response(200)
         self.send_header("Content-type", "text/plain")
         self.end_headers()
         self.wfile.write(run_process.stdout.encode('utf-8'))
+
+
 
     def do_POST(self):
         if self.path == "/execute-java":
