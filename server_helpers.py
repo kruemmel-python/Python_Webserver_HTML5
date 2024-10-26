@@ -14,6 +14,7 @@ import cgi
 from datetime import datetime
 import mimetypes
 import stat
+import re
 
 # Standardwerte und Konfigurationen
 default_port = 8000
@@ -23,12 +24,8 @@ log_handler = RotatingFileHandler('server.log', maxBytes=10000, backupCount=5)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logging.getLogger().addHandler(log_handler)
 
+# Verzeichnis aus den Einstellungen laden
 def load_directory():
-    """
-    Lädt das Verzeichnis aus den Einstellungen.
-
-    :return: Das Verzeichnis aus den Einstellungen oder das Standardverzeichnis.
-    """
     if os.path.exists(settings_file):
         with open(settings_file, "r") as file:
             settings = json.load(file)
@@ -41,13 +38,8 @@ download_directory = os.path.join(directory, "downloads")
 if not os.path.exists(download_directory):
     os.makedirs(download_directory)
 
+# Funktion zum Laden der Einstellungen aus der JSON-Datei
 def load_settings():
-    """
-    Lädt die Einstellungen aus der JSON-Datei und aktualisiert die globalen Variablen.
-
-    :global directory: Das Hauptverzeichnis.
-    :global default_port: Der Standard-Port.
-    """
     global directory, default_port
     if os.path.exists(settings_file):
         try:
@@ -60,13 +52,8 @@ def load_settings():
             logging.error(f"Fehler beim Laden der Einstellungen: {e}")
             messagebox.showerror("Fehler", f"Fehler beim Laden der Einstellungen: {e}")
 
+# Erweiterte Funktion zur Erkennung der Dateierweiterung basierend auf der Dateisignatur
 def get_file_extension(file_content):
-    """
-    Erkennt die Dateierweiterung basierend auf der Dateisignatur.
-
-    :param file_content: Der Inhalt der Datei.
-    :return: Die Dateierweiterung als String.
-    """
     if file_content.startswith(b'\x89PNG\r\n\x1a\n'):
         return ".png"
     elif file_content.startswith(b'\xFF\xD8\xFF'):
@@ -109,23 +96,13 @@ def get_file_extension(file_content):
     else:
         return ".unknown"
 
+# Serverklasse definieren
 class MyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
-    """
-    Erweiterte HTTP-Request-Handler-Klasse.
-    """
     def __init__(self, *args, **kwargs):
-        """
-        Initialisiert den HTTP-Request-Handler.
-
-        :param args: Positionsargumente.
-        :param kwargs: Schlüsselwortargumente.
-        """
         super().__init__(*args, directory=directory, **kwargs)
 
+
     def do_GET(self):
-        """
-        Behandelt GET-Anfragen.
-        """
         # Wenn der Pfad mit /downloads/ beginnt, setze das richtige Verzeichnis
         if self.path.startswith("/downloads/"):
             # Konvertiere den Pfad, um auf den lokalen Dateisystempfad im downloads-Ordner zu verweisen
@@ -141,128 +118,130 @@ class MyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             else:
                 self.send_error(404, "File not found.")
         elif self.path.endswith(".java"):
-            self.execute_java()
+            # Direktes Ausführen einer angeforderten Java-Datei
+            java_file = self.translate_path(self.path)
+            class_name = os.path.splitext(os.path.basename(java_file))[0]
+            self.execute_java(java_file, class_name)
         elif self.path == "/file-list":
             self.send_file_list()
         else:
             # Standardverhalten für andere Pfade
             super().do_GET()
 
+
     def send_file_list(self):
-        """
-        Sendet eine Liste der Dateien im Download-Verzeichnis.
-        """
         files = os.listdir(download_directory)
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
         self.wfile.write(json.dumps(files).encode("utf-8"))
 
-    def execute_java(self):
-        """
-        Kompiliert und führt eine Java-Datei aus.
-        """
-        java_file = self.translate_path(self.path)
-        if not os.path.exists(java_file):
-            self.send_error(404, "Java-Datei nicht gefunden")
-            return
-        try:
-            compile_process = subprocess.run(["javac", java_file], capture_output=True, text=True)
-            if compile_process.returncode != 0:
-                self.send_error(500, f"Kompilierungsfehler:\n{compile_process.stderr}")
-                return
-            java_class = os.path.splitext(os.path.basename(java_file))[0]
-            run_process = subprocess.run(["java", "-cp", directory, java_class], capture_output=True, text=True)
-            if run_process.returncode != 0:
-                self.send_error(500, f"Fehler bei der Ausführung:\n{run_process.stderr}")
-                return
-            self.send_response(200)
-            self.send_header("Content-type", "text/plain")
-            self.end_headers()
-            self.wfile.write(run_process.stdout.encode('utf-8'))
-        except Exception as e:
-            self.send_error(500, f"Serverfehler: {e}")
+    def execute_java(self, java_file, class_name):
+        # Verwenden des vollständigen Pfads zu `javac` und `java`
+        java_home_path = os.path.dirname(gui_helpers.java_path)
+        javac_path = os.path.join(java_home_path, "javac")
+        java_exec_path = os.path.join(java_home_path, "java")
 
-    def send_image(self):
-        """
-        Sendet ein Bild.
-        """
-        try:
-            image_path = self.translate_path(self.path)
-            with open(image_path, 'rb') as file:
-                self.send_response(200)
-                self.send_header("Content-type", "image/png")
-                self.end_headers()
-                self.wfile.write(file.read())
-        except Exception as e:
-            self.send_error(404, "Bild nicht gefunden")
+        logging.info(f"Verwende javac-Pfad: {javac_path}")
+        logging.info(f"Verwende java-Pfad: {java_exec_path}")
+
+        # Kompilieren der Java-Datei
+        compile_process = subprocess.run(
+            [javac_path, "-source", "8", "-target", "8", java_file],
+            capture_output=True, text=True
+        )
+        if compile_process.returncode != 0:
+            logging.error(f"Kompilierungsfehler: {compile_process.stderr}")
+            self.send_error(500, f"Kompilierungsfehler: {compile_process.stderr}")
+            return
+
+        # Ausführen der kompilierten Java-Klasse
+        run_process = subprocess.run(
+            [java_exec_path, "-cp", os.path.dirname(java_file), class_name],
+            capture_output=True, text=True
+        )
+        if run_process.returncode != 0:
+            logging.error(f"Fehler bei der Ausführung: {run_process.stderr}")
+            self.send_error(500, f"Fehler bei der Ausführung: {run_process.stderr}")
+            return
+
+        # Rückgabe der Ausgabe an den Client
+        self.send_response(200)
+        self.send_header("Content-type", "text/plain")
+        self.end_headers()
+        self.wfile.write(run_process.stdout.encode('utf-8'))
 
     def do_POST(self):
-        """
-        Behandelt POST-Anfragen.
-
-        Diese Methode wird aufgerufen, wenn eine POST-Anfrage an den Server gesendet wird.
-        Sie unterstützt das Hochladen von Dateien im Format 'multipart/form-data'.
-
-        :param self: Die Instanz der HTTP-Request-Handler-Klasse.
-        """
-        if self.path == "/upload":
-            # Überprüfe den Content-Type der Anfrage
+        if self.path == "/execute-java":
+            self.handle_java_execution()
+        elif self.path == "/upload":
             content_type, pdict = cgi.parse_header(self.headers.get('Content-Type'))
             if content_type == 'multipart/form-data':
-                # Konvertiere die Grenze und die Inhaltslänge in Bytes
                 pdict['boundary'] = bytes(pdict['boundary'], "utf-8")
                 pdict['CONTENT-LENGTH'] = int(self.headers.get('Content-Length'))
-                # Analysiere die multipart-Daten
                 form_data = cgi.parse_multipart(self.rfile, pdict)
-                logging.info(f"Form data: {form_data}")
                 if 'file' in form_data:
-                    # Extrahiere den Inhalt der hochgeladenen Datei
-                    file_content = form_data['file'][0]
-                    # Extrahiere den ursprünglichen Dateinamen aus dem Content-Disposition-Header
-                    content_disposition = self.headers.get('Content-Disposition')
-                    original_filename = "unknown_file"
-                    if content_disposition:
-                        _, params = cgi.parse_header(content_disposition)
-                        original_filename = params.get('filename', 'unknown_file').strip('"')
-                    # Bestimme die Dateierweiterung basierend auf dem Dateiinhalt
-                    file_extension = get_file_extension(file_content)
-                    filename = f"{os.path.splitext(original_filename)[0]}{file_extension}"
-                    file_path = os.path.join(download_directory, filename)
-                    counter = 1
-                    # Verhindere Überschreiben von Dateien durch Hinzufügen eines Zählers
-                    while os.path.exists(file_path):
-                        filename = f"{os.path.splitext(original_filename)[0]}_{counter}{file_extension}"
-                        file_path = os.path.join(download_directory, filename)
-                        counter += 1
-                    # Speichere die Datei im Download-Verzeichnis
-                    with open(file_path, 'wb') as output_file:
-                        output_file.write(file_content)
-                    # Sende eine Erfolgsantwort an den Client
-                    self.send_response(200)
-                    self.send_header("Content-Type", "text/plain")
-                    self.end_headers()
-                    self.wfile.write(b'Upload erfolgreich!')
-                    logging.info(f"Datei {filename} erfolgreich hochgeladen")
+                    # Speichern der Datei
+                    self.save_uploaded_file(form_data['file'][0])
                 else:
-                    logging.error("Keine Datei im Upload gefunden.")
                     self.send_error(400, "Keine Datei im Upload gefunden.")
             else:
-                logging.error(f"Ungültiger Content-Type für Upload: {content_type}")
                 self.send_error(400, "Ungültiger Content-Type für Upload.")
 
+    def handle_java_execution(self):
+        content_length = int(self.headers['Content-Length'])
+        post_data = self.rfile.read(content_length)
+        try:
+            data = json.loads(post_data)
+            code = data.get("code")
+            if code:
+                # Extrahiere den Klassennamen
+                match = re.search(r'public class (\w+)', code)
+                if not match:
+                    self.send_error(400, "Java-Klassennamen konnte nicht gefunden werden.")
+                    return
+                class_name = match.group(1)
+
+                # Speichern des Java-Codes in einer temporären Datei mit dem Klassennamen
+                java_file = os.path.join(directory, f"{class_name}.java")
+                with open(java_file, "w") as f:
+                    f.write(code)
+
+                # Kompilieren und Ausführen des Java-Codes
+                self.execute_java(java_file, class_name)
+            else:
+                self.send_error(400, "Kein Java-Code empfangen.")
+        except Exception as e:
+            self.send_error(500, f"Serverfehler: {str(e)}")
+
+
+    def save_uploaded_file(self, file_content):
+        content_disposition = self.headers.get('Content-Disposition')
+        original_filename = "unknown_file"
+        if content_disposition:
+            _, params = cgi.parse_header(content_disposition)
+            original_filename = params.get('filename', 'unknown_file').strip('"')
+        file_extension = get_file_extension(file_content)
+        filename = f"{os.path.splitext(original_filename)[0]}{file_extension}"
+        file_path = os.path.join(download_directory, filename)
+        counter = 1
+        while os.path.exists(file_path):
+            filename = f"{os.path.splitext(original_filename)[0]}_{counter}{file_extension}"
+            file_path = os.path.join(download_directory, filename)
+            counter += 1
+        with open(file_path, 'wb') as output_file:
+            output_file.write(file_content)
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain")
+        self.end_headers()
+        self.wfile.write(b'Upload erfolgreich!')
+        logging.info(f"Datei {filename} erfolgreich hochgeladen")
+
+# ThreadingTCPServer für parallele Anfragen
 class MyTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
-    """
-    Erweiterte TCP-Server-Klasse für parallele Anfragen.
-    """
     allow_reuse_address = True
 
 def start_server():
-    """
-    Startet den Server.
-
-    :global server_thread: Der Server-Thread.
-    """
     global server_thread
     if server_thread and server_thread.is_alive():
         messagebox.showinfo("Info", "Server läuft bereits.")
@@ -279,11 +258,6 @@ def start_server():
         logging.error(f"Server konnte nicht gestartet werden: {e}")
 
 def stop_server():
-    """
-    Stoppt den Server.
-
-    :global server_thread: Der Server-Thread.
-    """
     global server_thread
     if server_thread and server_thread.is_alive():
         server_thread = None
@@ -291,12 +265,6 @@ def stop_server():
         messagebox.showinfo("Server gestoppt", "Der Server wurde gestoppt.")
 
 def find_free_port(start_port=default_port):
-    """
-    Findet einen freien Port.
-
-    :param start_port: Der Startport.
-    :return: Der erste freie Port.
-    """
     port = start_port
     while True:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
