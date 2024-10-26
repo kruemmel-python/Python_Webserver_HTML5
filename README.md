@@ -1,6 +1,7 @@
 # Python Webserver GUI für HTML5 und Dateiverwaltung
 
 Dieses Projekt ist eine grafische Benutzeroberfläche (GUI) für einen erweiterten Python-Webserver, der die Verwaltung von HTML5-Dateien und anderen Dateitypen ermöglicht. Die Anwendung unterstützt das Hochladen und Herunterladen von Dateien, die Verwaltung von SSL-Zertifikaten, die Integration von MySQL und Java sowie das Setzen von Dateiberechtigungen.
+![image](https://github.com/user-attachments/assets/4a7adc2e-d20d-4542-a0ac-eeab2ce3bfc3)
 
 ## Inhaltsverzeichnis
 
