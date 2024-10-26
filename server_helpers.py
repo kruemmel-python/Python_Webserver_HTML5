@@ -93,8 +93,25 @@ def get_file_extension(file_content):
         return ".ipynb"
     elif file_content.startswith(b'\xEF\xBB\xBF'):
         return ".txt"
+
+    # Video-Dateien
+    elif file_content[4:8] == b'ftyp':
+        # MP4-Datei (prüfen auf ftyp Box im Header)
+        if file_content[8:12] in [b'isom', b'iso2', b'avc1', b'mp41', b'mp42']:
+            return ".mp4"
+    elif file_content.startswith(b'RIFF') and file_content[8:12] == b'AVI ':
+        # AVI-Datei
+        return ".avi"
+    elif file_content.startswith(b'\x1A\x45\xDF\xA3'):
+        # WebM-Datei (Teil von Matroska-Format)
+        return ".webm"
+    elif file_content.startswith(b'\x30\x26\xB2\x75\x8E\x66\xCF\x11'):
+        # WMV-Datei (Microsoft Advanced Systems Format)
+        return ".wmv"
+    
     else:
         return ".unknown"
+
 
 # Serverklasse definieren
 class MyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
