@@ -1,0 +1,9 @@
+{
+    "name": "Beispiel Webseite",
+    "description": "Eine einfache Webseite zur Demonstration von HTML, CSS und JSON.",
+    "year": 2023,
+    "contact": {
+        "email": "kontakt@beispielseite.de",
+        "phone": "+49 123 456 789"
+    }
+}
