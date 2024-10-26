@@ -20,8 +20,17 @@ settings_file = "server_settings.json"  # Einstellungsdatei
 if not os.path.exists(download_directory):
     os.makedirs(download_directory)
 
-# Funktion zum Laden der Einstellungen aus einer JSON-Datei
 def load_settings():
+    """
+    Lädt die Einstellungen aus einer JSON-Datei und aktualisiert die GUI entsprechend.
+
+    :global directory: Das Hauptverzeichnis.
+    :global mysql_path: Der Pfad zur MySQL-Datei.
+    :global java_path: Der Pfad zum Java-Interpreter.
+    :global certfile_path: Der Pfad zum SSL-Zertifikat.
+    :global keyfile_path: Der Pfad zum SSL-Schlüssel.
+    :global default_port: Der Standard-Port.
+    """
     global directory, mysql_path, java_path, certfile_path, keyfile_path, default_port
     if os.path.exists(settings_file):
         try:
@@ -44,8 +53,16 @@ def load_settings():
         except Exception as e:
             messagebox.showerror("Fehler", f"Fehler beim Laden der Einstellungen: {e}")
 
-# Funktion zum Speichern der Einstellungen in einer JSON-Datei
 def save_settings():
+    """
+    Speichert die aktuellen Einstellungen in einer JSON-Datei.
+
+    :global directory: Das Hauptverzeichnis.
+    :global mysql_path: Der Pfad zur MySQL-Datei.
+    :global java_path: Der Pfad zum Java-Interpreter.
+    :global certfile_path: Der Pfad zum SSL-Zertifikat.
+    :global keyfile_path: Der Pfad zum SSL-Schlüssel.
+    """
     settings = {
         "directory": directory,
         "mysql_path": mysql_path,
@@ -61,8 +78,10 @@ def save_settings():
     except Exception as e:
         messagebox.showerror("Fehler", f"Fehler beim Speichern der Einstellungen: {e}")
 
-# Funktion zum Löschen der Einstellungsdatei
 def delete_settings():
+    """
+    Löscht die Einstellungsdatei.
+    """
     if os.path.exists(settings_file):
         try:
             os.remove(settings_file)
@@ -72,8 +91,12 @@ def delete_settings():
     else:
         messagebox.showinfo("Info", "Einstellungsdatei existiert nicht.")
 
-# Funktionen zur Auswahl von Dateien und Verzeichnissen
 def select_directory():
+    """
+    Öffnet einen Dialog zur Auswahl des Stammverzeichnisses und aktualisiert die GUI.
+
+    :global directory: Das Hauptverzeichnis.
+    """
     global directory
     directory = filedialog.askdirectory(initialdir=directory)
     if directory:
@@ -81,27 +104,51 @@ def select_directory():
         list_directory_contents()
 
 def select_mysql():
+    """
+    Öffnet einen Dialog zur Auswahl der MySQL-Datei und aktualisiert die GUI.
+
+    :global mysql_path: Der Pfad zur MySQL-Datei.
+    """
     global mysql_path
     mysql_path = filedialog.askopenfilename(filetypes=[("MySQL", "mysql*"), ("Alle Dateien", "*.*")])
     mysql_label.config(text=f"MySQL-Pfad: {mysql_path}")
 
 def select_java():
+    """
+    Öffnet einen Dialog zur Auswahl des Java-Interpreters und aktualisiert die GUI.
+
+    :global java_path: Der Pfad zum Java-Interpreter.
+    """
     global java_path
     java_path = filedialog.askopenfilename(filetypes=[("Java", "java*"), ("Alle Dateien", "*.*")])
     java_label.config(text=f"Java-Pfad: {java_path}")
 
 def select_certfile():
+    """
+    Öffnet einen Dialog zur Auswahl des SSL-Zertifikats und aktualisiert die GUI.
+
+    :global certfile_path: Der Pfad zum SSL-Zertifikat.
+    """
     global certfile_path
     certfile_path = filedialog.askopenfilename(filetypes=[("PEM-Zertifikat", "*.pem"), ("Alle Dateien", "*.*")])
     certfile_label.config(text=f"Zertifikat: {certfile_path}")
 
 def select_keyfile():
+    """
+    Öffnet einen Dialog zur Auswahl des SSL-Schlüssels und aktualisiert die GUI.
+
+    :global keyfile_path: Der Pfad zum SSL-Schlüssel.
+    """
     global keyfile_path
     keyfile_path = filedialog.askopenfilename(filetypes=[("PEM-Schlüssel", "*.pem"), ("Alle Dateien", "*.*")])
     keyfile_label.config(text=f"Schlüssel: {keyfile_path}")
 
-# Funktion zum Auflisten der Verzeichnisinhalte
 def list_directory_contents():
+    """
+    Listet die Inhalte des aktuellen Verzeichnisses auf.
+
+    :global directory: Das Hauptverzeichnis.
+    """
     file_tree.delete(*file_tree.get_children())
     if os.path.isdir(directory):
         items = os.listdir(directory)
@@ -112,6 +159,12 @@ def list_directory_contents():
             file_tree.insert("", "end", iid=full_path, values=(item, permissions, file_type))
 
 def get_file_permissions(path):
+    """
+    Gibt die Berechtigungen einer Datei oder eines Verzeichnisses zurück.
+
+    :param path: Der Pfad zur Datei oder zum Verzeichnis.
+    :return: Eine Zeichenkette, die die Berechtigungen darstellt.
+    """
     st_mode = os.stat(path).st_mode
     perms = (
         ("r" if st_mode & stat.S_IRUSR else "-") +
@@ -127,6 +180,9 @@ def get_file_permissions(path):
     return perms
 
 def set_permissions():
+    """
+    Setzt die Berechtigungen für die ausgewählte Datei oder das ausgewählte Verzeichnis.
+    """
     selected = file_tree.selection()
     if not selected:
         messagebox.showinfo("Info", "Bitte wählen Sie eine Datei oder einen Ordner aus.")
@@ -150,8 +206,12 @@ def set_permissions():
     except Exception as e:
         messagebox.showerror("Fehler", f"Berechtigungen konnten nicht gesetzt werden: {e}")
 
-# Funktion zum Wechseln in einen Ordner
 def change_directory(event):
+    """
+    Wechselt in den ausgewählten Ordner.
+
+    :param event: Das Ereignis, das den Wechsel auslöst.
+    """
     global directory
     selected = file_tree.selection()
     if not selected:
@@ -163,8 +223,10 @@ def change_directory(event):
         directory_label.config(text=f"Stammverzeichnis: {directory}")
         list_directory_contents()
 
-# Funktion zum Zurückkehren zum übergeordneten Verzeichnis
 def go_back():
+    """
+    Kehrt zum übergeordneten Verzeichnis zurück.
+    """
     global directory
     parent_directory = os.path.dirname(directory)
     if parent_directory != directory:
@@ -172,8 +234,10 @@ def go_back():
         directory_label.config(text=f"Stammverzeichnis: {directory}")
         list_directory_contents()
 
-# Funktion zum Beenden des Servers und Schließen des Fensters
 def on_closing():
+    """
+    Beendet den Server und schließt das Fenster.
+    """
     server_helpers.stop_server()
     save_settings()
     app.destroy()
@@ -256,6 +320,11 @@ status_label = tk.Label(app, text="Server ist gestoppt", fg="red")
 status_label.grid(row=11, column=0, columnspan=3, pady=10)
 
 def update_status(status):
+    """
+    Aktualisiert den Serverstatus-Label.
+
+    :param status: Der aktuelle Serverstatus ("running" oder "stopped").
+    """
     if status == "running":
         status_label.config(text="Server läuft", fg="green")
     else:
