@@ -167,15 +167,9 @@ class MyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             [javac_path, "--release", "8", java_file],
             capture_output=True, text=True
         )
-    
-        # Filtern der Fehlermeldung, nur Zeilen mit dem Begriff "Fehler" behalten
-        error_lines = "\n".join(
-            line for line in compile_process.stderr.splitlines() if "Fehler" in line
-        )
-    
         if compile_process.returncode != 0:
-            # Rückgabe nur der gefilterten Fehlermeldungen an den Client
-            error_message = f"Kompilierungsfehler:\n{error_lines}"
+            # Rückgabe des Kompilierungsfehlers als Klartext an den Client
+            error_message = f"Kompilierungsfehler:\n{compile_process.stderr}"
             logging.error(error_message)
             self.send_response(400)  # Statuscode 400 für Bad Request
             self.send_header("Content-type", "text/plain")
@@ -203,7 +197,6 @@ class MyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header("Content-type", "text/plain")
         self.end_headers()
         self.wfile.write(run_process.stdout.encode('utf-8'))
-
 
 
     def do_POST(self):
