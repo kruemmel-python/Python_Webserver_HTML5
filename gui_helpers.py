@@ -12,6 +12,8 @@ directory = os.path.join(os.getcwd(), "www")  # Hauptverzeichnis setzen
 download_directory = os.path.join(directory, "downloads")
 mysql_path = None
 java_path = "java"  # Standardpfad für Java-Interpreter
+python_path = "python"  # Standardpfad für Python-Interpreter
+cpp_path = "g++"  # Standardpfad für C++-Compiler
 certfile_path = None  # Pfad zum SSL-Zertifikat
 keyfile_path = None  # Pfad zum SSL-Schlüssel
 settings_file = "server_settings.json"  # Einstellungsdatei
@@ -22,7 +24,7 @@ if not os.path.exists(download_directory):
 
 # Funktion zum Laden der Einstellungen aus einer JSON-Datei
 def load_settings():
-    global directory, mysql_path, java_path, certfile_path, keyfile_path, default_port
+    global directory, mysql_path, java_path, python_path, cpp_path, certfile_path, keyfile_path, default_port
     if os.path.exists(settings_file):
         try:
             with open(settings_file, "r") as file:
@@ -30,6 +32,8 @@ def load_settings():
                 directory = settings.get("directory", os.getcwd())
                 mysql_path = settings.get("mysql_path", None)
                 java_path = settings.get("java_path", "java")
+                python_path = settings.get("python_path", "python")
+                cpp_path = settings.get("cpp_path", "g++")
                 certfile_path = settings.get("certfile_path", None)
                 keyfile_path = settings.get("keyfile_path", None)
                 default_port = settings.get("port", 8000)
@@ -37,6 +41,8 @@ def load_settings():
                 directory_label.config(text=f"Stammverzeichnis: {directory}")
                 mysql_label.config(text=f"MySQL-Pfad: {mysql_path}")
                 java_label.config(text=f"Java-Pfad: {java_path}")
+                python_label.config(text=f"Python-Pfad: {python_path}")
+                cpp_label.config(text=f"C++-Pfad: {cpp_path}")
                 certfile_label.config(text=f"Zertifikat: {certfile_path}")
                 keyfile_label.config(text=f"Schlüssel: {keyfile_path}")
                 port_entry.delete(0, tk.END)
@@ -50,6 +56,8 @@ def save_settings():
         "directory": directory,
         "mysql_path": mysql_path,
         "java_path": java_path,
+        "python_path": python_path,
+        "cpp_path": cpp_path,
         "certfile_path": certfile_path,
         "keyfile_path": keyfile_path,
         "port": port_entry.get()
@@ -89,6 +97,16 @@ def select_java():
     global java_path
     java_path = filedialog.askopenfilename(filetypes=[("Java", "java*"), ("Alle Dateien", "*.*")])
     java_label.config(text=f"Java-Pfad: {java_path}")
+
+def select_python():
+    global python_path
+    python_path = filedialog.askopenfilename(filetypes=[("Python", "python*"), ("Alle Dateien", "*.*")])
+    python_label.config(text=f"Python-Pfad: {python_path}")
+
+def select_cpp():
+    global cpp_path
+    cpp_path = filedialog.askopenfilename(filetypes=[("C++", "g++*"), ("Alle Dateien", "*.*")])
+    cpp_label.config(text=f"C++-Pfad: {cpp_path}")
 
 def select_certfile():
     global certfile_path
@@ -215,45 +233,55 @@ java_label = tk.Label(app, text="Java-Pfad: Nicht ausgewählt")
 java_label.grid(row=3, column=0, columnspan=2, padx=10, pady=5, sticky="w")
 tk.Button(app, text="Java auswählen", command=select_java).grid(row=3, column=2, padx=10, pady=5)
 
+# Python-Pfad-Auswahl
+python_label = tk.Label(app, text="Python-Pfad: Nicht ausgewählt")
+python_label.grid(row=4, column=0, columnspan=2, padx=10, pady=5, sticky="w")
+tk.Button(app, text="Python auswählen", command=select_python).grid(row=4, column=2, padx=10, pady=5)
+
+# C++-Pfad-Auswahl
+cpp_label = tk.Label(app, text="C++-Pfad: Nicht ausgewählt")
+cpp_label.grid(row=5, column=0, columnspan=2, padx=10, pady=5, sticky="w")
+tk.Button(app, text="C++ auswählen", command=select_cpp).grid(row=5, column=2, padx=10, pady=5)
+
 # SSL-Zertifikat-Auswahl
 certfile_label = tk.Label(app, text="Zertifikat: Nicht ausgewählt")
-certfile_label.grid(row=4, column=0, columnspan=2, padx=10, pady=5, sticky="w")
-tk.Button(app, text="Zertifikat auswählen", command=select_certfile).grid(row=4, column=2, padx=10, pady=5)
+certfile_label.grid(row=6, column=0, columnspan=2, padx=10, pady=5, sticky="w")
+tk.Button(app, text="Zertifikat auswählen", command=select_certfile).grid(row=6, column=2, padx=10, pady=5)
 
 # SSL-Schlüssel-Auswahl
 keyfile_label = tk.Label(app, text="Schlüssel: Nicht ausgewählt")
-keyfile_label.grid(row=5, column=0, columnspan=2, padx=10, pady=5, sticky="w")
-tk.Button(app, text="Schlüssel auswählen", command=select_keyfile).grid(row=5, column=2, padx=10, pady=5)
+keyfile_label.grid(row=7, column=0, columnspan=2, padx=10, pady=5, sticky="w")
+tk.Button(app, text="Schlüssel auswählen", command=select_keyfile).grid(row=7, column=2, padx=10, pady=5)
 
 # Datei- und Ordnerliste
 file_tree = ttk.Treeview(app, columns=("name", "permissions", "type"), show="headings")
 file_tree.heading("name", text="Name")
 file_tree.heading("permissions", text="Berechtigungen")
 file_tree.heading("type", text="Typ")
-file_tree.grid(row=6, column=0, columnspan=3, padx=10, pady=5)
+file_tree.grid(row=8, column=0, columnspan=3, padx=10, pady=5)
 file_tree.bind("<Double-1>", change_directory)  # Doppelklick zum Wechseln in einen Ordner
 
 # Zurück-Button
-tk.Button(app, text="Zurück", command=go_back).grid(row=7, column=0, padx=10, pady=5)
+tk.Button(app, text="Zurück", command=go_back).grid(row=9, column=0, padx=10, pady=5)
 
 # Berechtigungen setzen
 read_var = tk.BooleanVar()
 write_var = tk.BooleanVar()
 execute_var = tk.BooleanVar()
 
-tk.Checkbutton(app, text="Lesen", variable=read_var).grid(row=8, column=0, sticky="w", padx=10)
-tk.Checkbutton(app, text="Schreiben", variable=write_var).grid(row=8, column=1, sticky="w", padx=10)
-tk.Checkbutton(app, text="Ausführen", variable=execute_var).grid(row=8, column=2, sticky="w", padx=10)
+tk.Checkbutton(app, text="Lesen", variable=read_var).grid(row=10, column=0, sticky="w", padx=10)
+tk.Checkbutton(app, text="Schreiben", variable=write_var).grid(row=10, column=1, sticky="w", padx=10)
+tk.Checkbutton(app, text="Ausführen", variable=execute_var).grid(row=10, column=2, sticky="w", padx=10)
 
-tk.Button(app, text="Berechtigungen setzen", command=set_permissions).grid(row=9, column=0, columnspan=3, padx=10, pady=10)
+tk.Button(app, text="Berechtigungen setzen", command=set_permissions).grid(row=11, column=0, columnspan=3, padx=10, pady=10)
 
 # Server-Steuerung
-tk.Button(app, text="Server starten", command=server_helpers.start_server, bg="green", fg="white").grid(row=10, column=0, padx=10, pady=20)
-tk.Button(app, text="Server stoppen", command=server_helpers.stop_server, bg="red", fg="white").grid(row=10, column=1, padx=10, pady=20)
+tk.Button(app, text="Server starten", command=server_helpers.start_server, bg="green", fg="white").grid(row=12, column=0, padx=10, pady=20)
+tk.Button(app, text="Server stoppen", command=server_helpers.stop_server, bg="red", fg="white").grid(row=12, column=1, padx=10, pady=20)
 
 # Serverstatus-Label
 status_label = tk.Label(app, text="Server ist gestoppt", fg="red")
-status_label.grid(row=11, column=0, columnspan=3, pady=10)
+status_label.grid(row=13, column=0, columnspan=3, pady=10)
 
 def update_status(status):
     if status == "running":
