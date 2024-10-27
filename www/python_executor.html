@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Java Code Executor</title>
+    <title>Python Code Executor</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -103,7 +103,7 @@
 </head>
 <body>
     <header>
-        <h1>Beispiel Webseite</h1>
+        <h1>Python Code Executor</h1>
         <nav>
             <ul>
                 <li><a href="index.html">Home</a></li>
@@ -118,15 +118,43 @@
         </nav>
     </header>
 
-    <main>
-        <section id="home">
-            <h2>Willkommen</h2>
-            <p>Dies ist die Startseite.</p>
-        </section>
-    </main>
+    <div class="container">
+        <h2>Python Code Executor</h2>
+        <p>Geben Sie Python-Code ein und führen Sie ihn aus:</p>
+        <textarea id="pythonCode" placeholder="print('Hello, World!')"></textarea>
+        <button onclick="executePythonCode()">Python-Code ausführen</button>
+        <div class="output" id="output">Ausgabe wird hier angezeigt...</div>
+    </div>
 
-    <footer>
-        <p>&copy; 2023 Beispiel Webseite</p>
-    </footer>
+    <script>
+        async function executePythonCode() {
+            const code = document.getElementById("pythonCode").value;
+            const outputDiv = document.getElementById("output");
+
+            outputDiv.textContent = "Python-Code wird ausgeführt...";
+
+            try {
+                const response = await fetch("/execute-python", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ code: code })
+                });
+
+                // Erhalte nur den Textinhalt der Antwort, unabhängig vom Status
+                const result = await response.text();
+
+                // Überprüfe den Status und zeige nur die Python-Fehlermeldung (kein Statuscode)
+                if (!response.ok) {
+                    outputDiv.textContent = result; // Zeigt nur die Fehlermeldung
+                } else {
+                    outputDiv.textContent = "Ausgabe:\n" + result; // Zeigt die Ausgabe bei erfolgreicher Ausführung
+                }
+            } catch (error) {
+                outputDiv.textContent = "Fehler beim Verbinden mit dem Server.";
+            }
+        }
+    </script>
 </body>
 </html>

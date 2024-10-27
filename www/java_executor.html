@@ -118,15 +118,43 @@
         </nav>
     </header>
 
-    <main>
-        <section id="home">
-            <h2>Willkommen</h2>
-            <p>Dies ist die Startseite.</p>
-        </section>
-    </main>
+    <div class="container">
+        <h2>Java Code Executor</h2>
+        <p>Geben Sie Java-Code ein und führen Sie ihn aus:</p>
+        <textarea id="javaCode" placeholder="public class TempJavaFile { public static void main(String[] args) { System.out.println(&quot;Hello, World!&quot;); } }"></textarea>
+        <button onclick="executeJavaCode()">Java-Code ausführen</button>
+        <div class="output" id="output">Ausgabe wird hier angezeigt...</div>
+    </div>
 
-    <footer>
-        <p>&copy; 2023 Beispiel Webseite</p>
-    </footer>
+    <script>
+        async function executeJavaCode() {
+            const code = document.getElementById("javaCode").value;
+            const outputDiv = document.getElementById("output");
+
+            outputDiv.textContent = "Java-Code wird ausgeführt...";
+
+            try {
+                const response = await fetch("/execute-java", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ code: code })
+                });
+
+                // Erhalte nur den Textinhalt der Antwort, unabhängig vom Status
+                const result = await response.text();
+
+                // Überprüfe den Status und zeige nur die Java-Fehlernachricht (kein Statuscode)
+                if (!response.ok) {
+                    outputDiv.textContent = result; // Zeigt nur die Fehlermeldung
+                } else {
+                    outputDiv.textContent = "Ausgabe:\n" + result; // Zeigt die Ausgabe bei erfolgreicher Kompilierung
+                }
+            } catch (error) {
+                outputDiv.textContent = "Fehler beim Verbinden mit dem Server.";
+            }
+        }
+    </script>
 </body>
 </html>
