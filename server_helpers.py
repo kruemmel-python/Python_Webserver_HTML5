@@ -108,16 +108,14 @@ def get_file_extension(file_content):
     elif file_content.startswith(b'\x30\x26\xB2\x75\x8E\x66\xCF\x11'):
         # WMV-Datei (Microsoft Advanced Systems Format)
         return ".wmv"
-    
+
     else:
         return ".unknown"
-
 
 # Serverklasse definieren
 class MyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=directory, **kwargs)
-
 
     def do_GET(self):
         # Wenn der Pfad mit /downloads/ beginnt, setze das richtige Verzeichnis
@@ -139,12 +137,19 @@ class MyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             java_file = self.translate_path(self.path)
             class_name = os.path.splitext(os.path.basename(java_file))[0]
             self.execute_java(java_file, class_name)
+        elif self.path.endswith(".py"):
+            # Direktes Ausführen einer angeforderten Python-Datei
+            python_file = self.translate_path(self.path)
+            self.execute_python(python_file)
+        elif self.path.endswith(".cpp"):
+            # Direktes Ausführen einer angeforderten C++-Datei
+            cpp_file = self.translate_path(self.path)
+            self.execute_cpp(cpp_file)
         elif self.path == "/file-list":
             self.send_file_list()
         else:
             # Standardverhalten für andere Pfade
             super().do_GET()
-
 
     def send_file_list(self):
         files = os.listdir(download_directory)
@@ -198,10 +203,82 @@ class MyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(run_process.stdout.encode('utf-8'))
 
+    def execute_python(self, python_file):
+        # Verwenden des vollständigen Pfads zu `python`
+        python_exec_path = gui_helpers.python_path
+
+        logging.info(f"Verwende python-Pfad: {python_exec_path}")
+
+        # Ausführen der Python-Datei
+        run_process = subprocess.run(
+            [python_exec_path, python_file],
+            capture_output=True, text=True
+        )
+        if run_process.returncode != 0:
+            # Rückgabe des Laufzeitfehlers an den Client
+            error_message = f"Fehler bei der Ausführung:\n{run_process.stderr}"
+            logging.error(error_message)
+            self.send_response(500)  # Statuscode 500 für internen Serverfehler
+            self.send_header("Content-type", "text/plain")
+            self.end_headers()
+            self.wfile.write(error_message.encode('utf-8'))
+            return
+
+        # Rückgabe der erfolgreichen Ausgabe
+        self.send_response(200)
+        self.send_header("Content-type", "text/plain")
+        self.end_headers()
+        self.wfile.write(run_process.stdout.encode('utf-8'))
+
+    def execute_cpp(self, cpp_file):
+        # Verwenden des vollständigen Pfads zu `g++`
+        cpp_exec_path = gui_helpers.cpp_path
+
+        logging.info(f"Verwende g++-Pfad: {cpp_exec_path}")
+
+        # Kompilieren der C++-Datei
+        compile_process = subprocess.run(
+            [cpp_exec_path, cpp_file, "-o", os.path.splitext(cpp_file)[0]],
+            capture_output=True, text=True
+        )
+        if compile_process.returncode != 0:
+            # Rückgabe des Kompilierungsfehlers als Klartext an den Client
+            error_message = f"Kompilierungsfehler:\n{compile_process.stderr}"
+            logging.error(error_message)
+            self.send_response(400)  # Statuscode 400 für Bad Request
+            self.send_header("Content-type", "text/plain")
+            self.end_headers()
+            self.wfile.write(error_message.encode('utf-8'))
+            return
+
+        # Ausführen der kompilierten C++-Datei
+        run_process = subprocess.run(
+            [os.path.splitext(cpp_file)[0]],
+            capture_output=True, text=True
+        )
+        if run_process.returncode != 0:
+            # Rückgabe des Laufzeitfehlers an den Client
+            error_message = f"Fehler bei der Ausführung:\n{run_process.stderr}"
+            logging.error(error_message)
+            self.send_response(500)  # Statuscode 500 für internen Serverfehler
+            self.send_header("Content-type", "text/plain")
+            self.end_headers()
+            self.wfile.write(error_message.encode('utf-8'))
+            return
+
+        # Rückgabe der erfolgreichen Ausgabe
+        self.send_response(200)
+        self.send_header("Content-type", "text/plain")
+        self.end_headers()
+        self.wfile.write(run_process.stdout.encode('utf-8'))
 
     def do_POST(self):
         if self.path == "/execute-java":
             self.handle_java_execution()
+        elif self.path == "/execute-python":
+            self.handle_python_execution()
+        elif self.path == "/execute-cpp":
+            self.handle_cpp_execution()
         elif self.path == "/upload":
             content_type, pdict = cgi.parse_header(self.headers.get('Content-Type'))
             if content_type == 'multipart/form-data':
@@ -242,6 +319,43 @@ class MyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         except Exception as e:
             self.send_error(500, f"Serverfehler: {str(e)}")
 
+    def handle_python_execution(self):
+        content_length = int(self.headers['Content-Length'])
+        post_data = self.rfile.read(content_length)
+        try:
+            data = json.loads(post_data)
+            code = data.get("code")
+            if code:
+                # Speichern des Python-Codes in einer temporären Datei
+                python_file = os.path.join(directory, "temp_python_script.py")
+                with open(python_file, "w") as f:
+                    f.write(code)
+
+                # Ausführen des Python-Codes
+                self.execute_python(python_file)
+            else:
+                self.send_error(400, "Kein Python-Code empfangen.")
+        except Exception as e:
+            self.send_error(500, f"Serverfehler: {str(e)}")
+
+    def handle_cpp_execution(self):
+        content_length = int(self.headers['Content-Length'])
+        post_data = self.rfile.read(content_length)
+        try:
+            data = json.loads(post_data)
+            code = data.get("code")
+            if code:
+                # Speichern des C++-Codes in einer temporären Datei
+                cpp_file = os.path.join(directory, "temp_cpp_script.cpp")
+                with open(cpp_file, "w") as f:
+                    f.write(code)
+
+                # Kompilieren und Ausführen des C++-Codes
+                self.execute_cpp(cpp_file)
+            else:
+                self.send_error(400, "Kein C++-Code empfangen.")
+        except Exception as e:
+            self.send_error(500, f"Serverfehler: {str(e)}")
 
     def save_uploaded_file(self, file_content):
         content_disposition = self.headers.get('Content-Disposition')
